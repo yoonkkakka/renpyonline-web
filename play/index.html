@@ -226,7 +226,57 @@
           }
       }
   </script>
-  <script src="renpy-pre.js"></script>
+  <!-- FIELD_WS_BRIDGE -->
+<script>
+  // 필드(실시간 오픈필드) 전용: 브라우저 네이티브 WebSocket <-> Ren'Py Python 브릿지.
+  // Python 쪽은 game/rpg/field_ws_web.rpy의 WebFieldSocket이 renpy.emscripten.run_script*()로 호출한다.
+  window.fieldSockets = {};
+  window.fieldQueues = {};
+  window.fieldNextId = 1;
+
+  function fieldConnect(url) {
+    var id = window.fieldNextId++;
+    window.fieldQueues[id] = [];
+    try {
+      var ws = new WebSocket(url);
+    } catch (e) {
+      window.fieldQueues[id].push("__CLOSED__");
+      return id;
+    }
+    ws.onmessage = function (ev) { window.fieldQueues[id].push(ev.data); };
+    ws.onclose = function () { window.fieldQueues[id].push("__CLOSED__"); };
+    ws.onerror = function () { window.fieldQueues[id].push("__CLOSED__"); };
+    window.fieldSockets[id] = ws;
+    return id;
+  }
+
+  function fieldSend(id, text) {
+    var ws = window.fieldSockets[id];
+    if (ws && ws.readyState === 1) { ws.send(text); }
+  }
+
+  function fieldPoll(id) {
+    var q = window.fieldQueues[id];
+    if (!q) return "[]";
+    var out = JSON.stringify(q);
+    window.fieldQueues[id] = [];
+    return out;
+  }
+
+  function fieldState(id) {
+    var ws = window.fieldSockets[id];
+    if (!ws) return -1;
+    return ws.readyState;
+  }
+
+  function fieldClose(id) {
+    var ws = window.fieldSockets[id];
+    if (ws) { try { ws.close(); } catch (e) {} }
+    delete window.fieldSockets[id];
+    delete window.fieldQueues[id];
+  }
+</script>
+<script src="renpy-pre.js"></script>
   <script async type="text/javascript" src="renpy.js"></script>
 </body>
 
